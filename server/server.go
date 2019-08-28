@@ -9,14 +9,21 @@ import (
 
 func handleMessages() {
 	for {
-		msg, _ := transport.Receive()
+		ch := make(chan transport.Packet)
+		for {
+			go transport.Receive(ch)
+			select {
+			case p := <-ch:
+				switch p.Message.Code {
+				case transport.IcmpCodeCommandMsg:
+					handleCommandMessage(p.Message)
+					break
+				default:
+					log.Println("Unhandled ICMP code", p.Message.Code)
+				}
 
-		switch msg.Code {
-		case transport.IcmpCodeCommandMsg:
-			handleCommandMessage(msg)
-			break
-		default:
-			log.Println("Unhandled ICMP code", msg.Code)
+				break
+			}
 		}
 	}
 }

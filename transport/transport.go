@@ -20,6 +20,11 @@ const(
 	IcmpCodeCommandReply	= 16
 )
 
+type Packet struct {
+	From *net.Addr
+	Message *icmp.Message
+}
+
 func getConnection() *icmp.PacketConn {
 	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
@@ -30,7 +35,7 @@ func getConnection() *icmp.PacketConn {
 	return conn
 }
 
-func Send(dest net.Addr, code int, msg []byte, ack bool) {
+func Send(dest net.Addr, code int, msg []byte, requireAck bool) {
 	conn := getConnection()
 	defer conn.Close()
 
@@ -56,7 +61,7 @@ func Send(dest net.Addr, code int, msg []byte, ack bool) {
 			panic(err)
 		}
 
-		if !ack || waitForAck(conn, dest, msg) {
+		if !requireAck || waitForAck(conn, dest, msg) {
 			return
 		}
 
@@ -108,7 +113,7 @@ func waitForAck(conn *icmp.PacketConn, dest net.Addr, msg []byte) bool {
 	return false
 }
 
-func Receive() (*icmp.Message, net.Addr) {
+func Receive(ch chan Packet) {
 	conn := getConnection()
 	defer conn.Close()
 
@@ -129,6 +134,9 @@ func Receive() (*icmp.Message, net.Addr) {
 			go Send(peer, IcmpCodeAck, sig[:], false)
 		}
 
-		return rm, peer
+		ch <- Packet{
+			From:    &peer,
+			Message: rm,
+		}
 	}
 }
