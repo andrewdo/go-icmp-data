@@ -1,0 +1,19 @@
+version: "3.7"
+
+services:
+  server:
+    build:
+      context: .
+    command: /app/server
+    networks:
+      - servernet
+
+  client:
+    build:
+      context: .
+    command: /app/server
+    networks:
+      - clientnet
+networks:
+  servernet:
+  clientnet:
