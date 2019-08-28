@@ -84,7 +84,7 @@ func waitForAck(conn *icmp.PacketConn, dest net.Addr, msg []byte) bool {
 
 		if rb, ok := rm.Body.(*icmp.Echo); ok {
 			var sig [16]byte
-			nb := copy(sig[:], rb.Data)
+			_ = copy(sig[:], rb.Data)
 			// && nb == 16 && md5.Sum(msg) == sig
 			if peer == dest && rm.Code == icmpCodeAck  {
 				ch <- true
