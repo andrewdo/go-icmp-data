@@ -6,14 +6,13 @@ services:
       context: .
     command: /app/server
     networks:
-      - servernet
-
+      - net
   client:
     build:
       context: .
     command: /app/server
     networks:
-      - clientnet
+      - net
+
 networks:
-  servernet:
-  clientnet:
+  net:

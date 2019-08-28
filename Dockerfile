@@ -2,7 +2,7 @@ FROM golang:latest
 
 RUN curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 
-RUN go get -d github.com/andrewdo/go-icmp-data/...
+RUN head -c 5 /dev/random > random_bytes && go get -d github.com/andrewdo/go-icmp-data/...
 WORKDIR $HOME/go/src/github.com/andrewdo/go-icmp-data
 RUN dep ensure
 RUN mkdir /app
