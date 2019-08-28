@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	addr, err := net.LookupIP("client")
+	addr, err := net.LookupIP("server")
 	if err != nil {
 		panic(err)
 	}
@@ -24,6 +24,6 @@ func main() {
 
 		log.Println("Sending command", cmd)
 
-		transport.Send(a, 15, []byte(cmd), true)
+		transport.Send(a, transport.IcmpCodeCommandMsg, []byte(cmd), true)
 	}
 }
