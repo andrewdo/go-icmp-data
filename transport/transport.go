@@ -15,10 +15,9 @@ const(
 	readBufferSize         	= 1500
 	timeoutSeconds			= 5
 	numRetries				= 5
-	icmpCodeAck				= 0
-	icmpCodePreKeyRequest  	= 15
-	icmpCodePreKeyResponse 	= 16
-	icmpCodeMessage        	= 8
+	IcmpCodeAck				= 0
+	IcmpCodeCommandMsg		= 15
+	IcmpCodeCommandReply	= 16
 )
 
 func getConnection() *icmp.PacketConn {
@@ -31,7 +30,7 @@ func getConnection() *icmp.PacketConn {
 	return conn
 }
 
-func Send(dest net.Addr, code int, msg []byte) {
+func Send(dest net.Addr, code int, msg []byte, ack bool) {
 	conn := getConnection()
 	defer conn.Close()
 
@@ -57,7 +56,7 @@ func Send(dest net.Addr, code int, msg []byte) {
 			panic(err)
 		}
 
-		if waitForAck(conn, dest, msg) {
+		if !ack || waitForAck(conn, dest, msg) {
 			return
 		}
 
@@ -86,7 +85,7 @@ func waitForAck(conn *icmp.PacketConn, dest net.Addr, msg []byte) bool {
 			var sig [16]byte
 			_ = copy(sig[:], rb.Data)
 			// && nb == 16 && md5.Sum(msg) == sig
-			if peer == dest && rm.Code == icmpCodeAck  {
+			if peer == dest && rm.Code == IcmpCodeAck  {
 				ch <- true
 			}
 		}
@@ -127,7 +126,7 @@ func Receive() (*icmp.Message, net.Addr) {
 		// send an ack
 		if rb, ok := rm.Body.(*icmp.Echo); ok {
 			sig := md5.Sum(rb.Data)
-			go Send(peer, icmpCodeAck, sig[:])
+			go Send(peer, IcmpCodeAck, sig[:], false)
 		}
 
 		return rm, peer

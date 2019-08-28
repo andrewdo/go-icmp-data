@@ -1,24 +1,29 @@
 package main
 
 import (
-	"github.com/andrewdo/go-icmp-data/transport"
-	"log"
-	"net"
-	"time"
+"bufio"
+"github.com/andrewdo/go-icmp-data/transport"
+"log"
+"net"
+"os"
 )
 
 func main() {
-	addr, err := net.LookupIP("server")
+	addr, err := net.LookupIP("client")
 	if err != nil {
 		panic(err)
 	}
+	a := &net.IPAddr{IP: addr[0]}
 
 	for {
-		transport.Send(&net.IPAddr{IP: addr[0]}, 15, []byte("FFFF"))
-		x, y := transport.Receive()
+		reader := bufio.NewReader(os.Stdin)
+		cmd, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatal(err)
+		}
 
-		log.Println(x, y)
+		log.Println("Sending command", cmd)
 
-		time.Sleep(10 * time.Second)
+		transport.Send(a, 15, []byte(cmd), true)
 	}
 }
