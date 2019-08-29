@@ -60,11 +60,14 @@ func Send(dest net.Addr, msg []byte, code int) *Packet {
 			panic(err)
 		}
 
+		log.Println("Sent message", msg)
+
+		// dont wait for a reply if we are sending a reply
 		if code == IcmpCodeCommandReply {
 			return nil
 		}
 
-		if r := waitForReply(conn, dest, msg); r != nil {
+		if r := waitForReply(conn, dest); r != nil {
 			return r
 		}
 
@@ -79,36 +82,41 @@ func Send(dest net.Addr, msg []byte, code int) *Packet {
 	return nil
 }
 
-func waitForReply(conn *icmp.PacketConn, dest net.Addr, msg []byte) *Packet {
+func waitForReply(conn *icmp.PacketConn, dest net.Addr) *Packet {
 	ch := make(chan *Packet, 1)
 	go func() {
 		rb := make([]byte, readBufferSize)
-		n, peer, err := conn.ReadFrom(rb)
-		if err != nil {
-			log.Println(err)
-			ch <- nil
-		}
-		rm, err := icmp.ParseMessage(1, rb[:n])
-		if err != nil {
-			log.Println(err)
-			ch <- nil
-		}
+		for {
+			n, peer, err := conn.ReadFrom(rb)
+			if err != nil {
+				log.Println(err)
+				ch <- nil
+				return
+			}
+			rm, err := icmp.ParseMessage(1, rb[:n])
+			if err != nil {
+				log.Println(err)
+				ch <- nil
+				return
+			}
 
-		if rb, ok := rm.Body.(*icmp.Echo); ok {
-			if peer.String() == dest.String() && rm.Code == IcmpCodeCommandReply  {
-				log.Println("Received reply", string(rb.Data))
-				ch <- &Packet{
-					From:    &peer,
-					Message: rm,
+			if rb, ok := rm.Body.(*icmp.Echo); ok {
+				if peer.String() == dest.String() && rm.Code == IcmpCodeCommandReply  {
+					log.Println("Received reply", string(rb.Data))
+					ch <- &Packet{
+						From:    &peer,
+						Message: rm,
+					}
+					return
+				} else {
+					log.Println("Received message was not the response")
 				}
 			} else {
-				log.Println("Received message was not the response")
+				log.Println("Failed to parse message as Echo body")
 			}
-		} else {
-			log.Println("Failed to parse message as Echo body")
-		}
 
-		ch <- nil
+			log.Println("Skipping message", rm)
+		}
 	}()
 
 	go func() {
