@@ -8,7 +8,7 @@ There is a server that listens for commands to run and responds with its output,
 
 ## Check it out
 Clone the repo and run `docker-compose up -d --build`. You will have the `server` and `client` containers running.
-Load up a shell of the `client` container and run the CLI executable at `/app/client` and wait for the output from the server.
+Load up a shell of the `client` container and run the CLI executable at `/app/client`, enter a command and wait for the output from the server.
 
 If you want to inspect the traffic, load up a shell of the `server` client and run install tcpdump `apt-get update && apt-get install -y tcpdump`
 and start listening to the traffic with `tcpdump -XX -i eth0 icmp`.

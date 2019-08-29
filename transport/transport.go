@@ -11,7 +11,7 @@ import (
 )
 
 const(
-	readBufferSize         	= 1500
+	readBufferSize			= 1500
 	timeoutSeconds			= 5
 	numRetries				= 5
 	IcmpCodeAck				= 0
