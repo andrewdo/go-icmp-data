@@ -21,7 +21,7 @@ services:
       go get github.com/andrewdo/go-icmp-data/...
       && mkdir /app
       && go build -o /app/client /go/src/github.com/andrewdo/go-icmp-data/client
-      && sleep infinity
+      && tail -f /dev/null
       "
     networks:
       - net
