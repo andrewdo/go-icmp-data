@@ -3,28 +3,25 @@ version: "3.7"
 services:
   server:
     image: golang:latest
-    volumes:
-      - .:/go/src/github.com/andrewdo/go-icmp-data
     command: bash -c "
       go get github.com/andrewdo/go-icmp-data/...
-      && mkdir /app
-      && go build -o /app/server /go/src/github.com/andrewdo/go-icmp-data/server
-      && /app/server
+      && cd /go/src/github.com/andrewdo/go-icmp-data && make deps && make
+      && mkdir -p /app && mv /go/src/github.com/andrewdo/go-icmp-data/server_out /app/server && /app/server
       "
     networks:
       - net
   client:
     image: golang:latest
-    volumes:
-      - .:/go/src/github.com/andrewdo/go-icmp-data
     command: bash -c "
       go get github.com/andrewdo/go-icmp-data/...
-      && mkdir /app
-      && go build -o /app/client /go/src/github.com/andrewdo/go-icmp-data/client
+      && cd /go/src/github.com/andrewdo/go-icmp-data && make deps && make
+      && mkdir -p /app && mv /go/src/github.com/andrewdo/go-icmp-data/client_out /app/client
       && tail -f /dev/null
       "
     networks:
       - net
+    depends_on:
+      - server
 
 networks:
   net:
