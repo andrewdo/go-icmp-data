@@ -24,6 +24,6 @@ func main() {
 
 		log.Println("Sending command", cmd)
 
-		transport.Send(a, transport.IcmpCodeCommandMsg, []byte(cmd), true)
+		transport.Send(a, []byte(cmd), transport.IcmpCodeCommandMsg)
 	}
 }

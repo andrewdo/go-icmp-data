@@ -2,15 +2,27 @@ version: "3.7"
 
 services:
   server:
-    build:
-      context: .
-    command: /app/server
+    image: golang:latest
+    volumes:
+      - .:/go/src/github.com/andrewdo/go-icmp-data
+    command: bash -c "
+      go get github.com/andrewdo/go-icmp-data/...
+      && mkdir /app
+      && go build -o /app/server /go/src/github.com/andrewdo/go-icmp-data/server
+      && /app/server
+      "
     networks:
       - net
   client:
-    build:
-      context: .
-    command: /app/server
+    image: golang:latest
+    volumes:
+      - .:/go/src/github.com/andrewdo/go-icmp-data
+    command: bash -c "
+      go get github.com/andrewdo/go-icmp-data/...
+      && mkdir /app
+      && go build -o /app/client /go/src/github.com/andrewdo/go-icmp-data/client
+      && sleep infinity
+      "
     networks:
       - net
 

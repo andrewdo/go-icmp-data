@@ -1,7 +1,6 @@
 package transport
 
 import (
-	"crypto/md5"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"log"
@@ -35,14 +34,14 @@ func getConnection() *icmp.PacketConn {
 	return conn
 }
 
-func Send(dest net.Addr, code int, msg []byte, requireAck bool) {
+func Send(dest net.Addr, msg []byte, code int) *Packet {
 	conn := getConnection()
 	defer conn.Close()
 
 	// TODO: message chunks and use ID for concurrency
 	id := rand.Int()
 	m := icmp.Message{
-		Type: ipv4.ICMPTypeEcho,
+		Type: ipv4.ICMPTypeEchoReply,
 		Code: code,
 		Body: &icmp.Echo{
 			ID: id,
@@ -55,14 +54,18 @@ func Send(dest net.Addr, code int, msg []byte, requireAck bool) {
 		log.Fatal(err)
 	}
 
-	// keep sending message until we get an ack
+	// keep sending the message until we get a response
 	for retries := numRetries + 1; retries > 0; retries-- {
 		if _, err := conn.WriteTo(wb, dest); err != nil {
 			panic(err)
 		}
 
-		if !requireAck || waitForAck(conn, dest, msg) {
-			return
+		if code == IcmpCodeCommandReply {
+			return nil
+		}
+
+		if r := waitForReply(conn, dest, msg); r != nil {
+			return r
 		}
 
 		rand.Seed(time.Now().UnixNano())
@@ -72,53 +75,51 @@ func Send(dest net.Addr, code int, msg []byte, requireAck bool) {
 	}
 
 	log.Fatal("Permanent failure sending message", dest, code, msg)
+
+	return nil
 }
 
-func waitForAck(conn *icmp.PacketConn, dest net.Addr, msg []byte) bool {
-	ch := make(chan bool, 1)
+func waitForReply(conn *icmp.PacketConn, dest net.Addr, msg []byte) *Packet {
+	ch := make(chan *Packet, 1)
 	go func() {
 		rb := make([]byte, readBufferSize)
 		n, peer, err := conn.ReadFrom(rb)
 		if err != nil {
 			log.Println(err)
-			ch <- false
+			ch <- nil
 		}
 		rm, err := icmp.ParseMessage(1, rb[:n])
 		if err != nil {
 			log.Println(err)
-			ch <- false
+			ch <- nil
 		}
 
 		if rb, ok := rm.Body.(*icmp.Echo); ok {
-			var sig [16]byte
-			_ = copy(sig[:], rb.Data)
-			// && nb == 16 && md5.Sum(msg) == sig
-			if peer == dest && rm.Code == IcmpCodeAck  {
-				log.Println("Received ack")
-				ch <- true
+			if peer.String() == dest.String() && rm.Code == IcmpCodeCommandReply  {
+				log.Println("Received reply", string(rb.Data))
+				ch <- &Packet{
+					From:    &peer,
+					Message: rm,
+				}
 			} else {
-				log.Println("Ack check failed", peer, rm)
+				log.Println("Received message was not the response")
 			}
 		} else {
 			log.Println("Failed to parse message as Echo body")
 		}
 
-		ch <- false
+		ch <- nil
 	}()
 
 	go func() {
 		time.Sleep(timeoutSeconds * time.Second)
-		ch <- false
+		ch <- nil
 	}()
 
 	select{
-	case s := <-ch:
-		if s {
-			return true
-		}
+	case p := <-ch:
+		return p
 	}
-
-	return false
 }
 
 func Receive(ch chan Packet) {
@@ -134,12 +135,6 @@ func Receive(ch chan Packet) {
 		rm, err := icmp.ParseMessage(1, rb[:n])
 		if err != nil {
 			log.Fatal(err)
-		}
-
-		// send an ack
-		if rb, ok := rm.Body.(*icmp.Echo); ok {
-			sig := md5.Sum(rb.Data)
-			go Send(peer, IcmpCodeAck, sig[:], false)
 		}
 
 		ch <- Packet{
