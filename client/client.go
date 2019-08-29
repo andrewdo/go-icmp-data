@@ -1,11 +1,11 @@
 package main
 
 import (
-"bufio"
-"github.com/andrewdo/go-icmp-data/transport"
-"log"
-"net"
-"os"
+	"bufio"
+	"github.com/andrewdo/go-icmp-data/transport"
+	"log"
+	"net"
+	"os"
 )
 
 func main() {

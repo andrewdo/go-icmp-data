@@ -65,6 +65,9 @@ func Send(dest net.Addr, code int, msg []byte, requireAck bool) {
 			return
 		}
 
+		rand.Seed(time.Now().UnixNano())
+		time.Sleep(time.Duration(rand.Intn(5) + 1) * time.Second)
+
 		log.Println("Retrying message", dest, code, msg)
 	}
 
@@ -91,8 +94,13 @@ func waitForAck(conn *icmp.PacketConn, dest net.Addr, msg []byte) bool {
 			_ = copy(sig[:], rb.Data)
 			// && nb == 16 && md5.Sum(msg) == sig
 			if peer == dest && rm.Code == IcmpCodeAck  {
+				log.Println("Received ack")
 				ch <- true
+			} else {
+				log.Println("Ack check failed", peer, rm)
 			}
+		} else {
+			log.Println("Failed to parse message as Echo body")
 		}
 
 		ch <- false
