@@ -33,10 +33,10 @@ func handlePacket(p *transport.Packet, cmds []string, outCh chan string) []strin
 	case transport.IcmpCodeCommandRequest:
 		// reply with next command, if any
 		if len(cmds) > 0 {
-			go transport.Send(*p.From, []byte(cmds[0]), transport.IcmpCodeCommandReply)
+			transport.Send(*p.From, []byte(cmds[0]), transport.IcmpCodeCommandReply)
 			cmds = cmds[1:]
 		} else {
-			go transport.Send(*p.From, []byte(""), transport.IcmpCodeCommandReply)
+			go transport.Send(*p.From, []byte(""), transport.IcmpCodeAck)
 		}
 		break
 	case transport.IcmpCodeCommandOutput:
@@ -47,29 +47,21 @@ func handlePacket(p *transport.Packet, cmds []string, outCh chan string) []strin
 		break
 	}
 
-	fmt.Println(cmds)
 	return cmds
 }
 
 func main() {
+	log.SetFlags(0)
+
 	cmdCh := make(chan string, 0)
 	outCh := make(chan string, 0)
 	defer close(cmdCh)
 	defer close(outCh)
 
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(2)
 
 	go serveCommands(cmdCh, outCh)
-	go func() {
-		for {
-			select {
-			case o := <-outCh:
-				fmt.Println(o)
-				break
-			}
-		}
-	}()
 	go func() {
 		for {
 			fmt.Print("> ")
@@ -80,6 +72,11 @@ func main() {
 			}
 
 			cmdCh <- strings.TrimSpace(cmd)
+			select {
+			case o := <-outCh:
+				fmt.Println(o)
+				break
+			}
 		}
 	}()
 
