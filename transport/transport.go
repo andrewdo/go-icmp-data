@@ -37,9 +37,6 @@ func getConnection() *icmp.PacketConn {
 }
 
 func Send(dest net.Addr, msg []byte, code int) *Packet {
-	conn := getConnection()
-	defer conn.Close()
-
 	// TODO: message chunks and use ID for concurrency
 	var t ipv4.ICMPType
 	if code == IcmpCodeCommandRequest || code == IcmpCodeCommandOutput {
@@ -50,7 +47,7 @@ func Send(dest net.Addr, msg []byte, code int) *Packet {
 	t = ipv4.ICMPTypeEchoReply
 	id := rand.Int()
 
-	m := icmp.Message{
+	m := &icmp.Message{
 		Type: t,
 		Code: code,
 		Body: &icmp.Echo{
@@ -59,36 +56,40 @@ func Send(dest net.Addr, msg []byte, code int) *Packet {
 			Data: msg,
 		},
 	}
+
+	return send(dest, m, code != IcmpCodeCommandReply && code != IcmpCodeAck)
+}
+
+func send(d net.Addr, m *icmp.Message, wait bool) *Packet {
+	conn := getConnection()
+	defer conn.Close()
+
 	wb, err := m.Marshal(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// keep sending the message until we get a response
 	for retries := numRetries + 1; retries > 0; retries-- {
-		if _, err := conn.WriteTo(wb, dest); err != nil {
+		if _, err := conn.WriteTo(wb, d); err != nil {
 			panic(err)
 		}
 
-		log.Println("Sent message", msg)
+		log.Println("Sent message", m.Body)
 
-		// dont wait for a reply if we are sending a reply
-		if code == IcmpCodeCommandReply || code == IcmpCodeAck {
+		if !wait {
 			return nil
 		}
 
-		if r := waitForReply(conn, dest); r != nil {
+		if r := waitForReply(conn, d); r != nil {
 			return r
 		}
 
-		rand.Seed(time.Now().UnixNano())
-		time.Sleep(time.Duration(rand.Intn(5) + 1) * time.Second)
+		time.Sleep(time.Duration(rand.Intn(timeoutSeconds) + 1) * time.Second)
 
-		log.Println("Retrying message", dest, code, msg)
+		log.Println("Retrying message", d, m.Code, m.Body)
 	}
 
-	log.Fatal("Permanent failure sending message", dest, code, msg)
-
+	log.Fatal("Failed after max retries", numRetries)
 	return nil
 }
 
