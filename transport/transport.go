@@ -163,6 +163,5 @@ func Receive(ch chan *Packet) {
 				Body:		b,
 			}
 		}
-
 	}
 }
