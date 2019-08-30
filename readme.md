@@ -11,7 +11,7 @@ There is also a shell process that polls for commands to run from the server.
 Clone the repo and run `docker-compose up -d --build`. You will have the `server` and `shell` containers running.
 The docker-compose will only compile the programs and place them in the `/app` directory.
 
-Load up a shell of the `server` container and run the CLI executable at `/app/server 2>/dev/null`, enter a command and wait for the output from the shell.
+Load up a shell of the `server` container and run the CLI executable at `/app/server`, enter a command and wait for the output from the shell.
 Then, load up a shell of the `shell` container and run the CLI executable at `/app/client` and let it sit.
 
 If you want to inspect the traffic, install tcpdump `apt-get update && apt-get install -y tcpdump`

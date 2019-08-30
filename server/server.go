@@ -51,8 +51,6 @@ func handlePacket(p *transport.Packet, cmds []string, outCh chan string) []strin
 }
 
 func main() {
-	log.SetFlags(0)
-
 	cmdCh := make(chan string, 0)
 	outCh := make(chan string, 0)
 	defer close(cmdCh)
