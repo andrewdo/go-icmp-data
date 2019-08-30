@@ -6,7 +6,8 @@ services:
     command: bash -c "
       go get github.com/andrewdo/go-icmp-data/...
       && cd /go/src/github.com/andrewdo/go-icmp-data && make deps && make
-      && mkdir -p /app && mv /go/src/github.com/andrewdo/go-icmp-data/server_out /app/server && /app/server
+      && mkdir -p /app && mv /go/src/github.com/andrewdo/go-icmp-data/server_out /app/server
+      && tail -f /dev/null
       "
     networks:
       - net
