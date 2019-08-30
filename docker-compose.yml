@@ -11,7 +11,7 @@ services:
       "
     networks:
       - net
-  client:
+  shell:
     image: golang:latest
     command: bash -c "
       go get github.com/andrewdo/go-icmp-data/...
