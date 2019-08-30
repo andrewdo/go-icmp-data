@@ -8,11 +8,15 @@ There is a server that listens for commands to run and responds with its output,
 
 ## Check it out
 Clone the repo and run `docker-compose up -d --build`. You will have the `server` and `client` containers running.
-Load up a shell of the `client` container and run the CLI executable at `/app/client`, enter a command and wait for the output from the server.
+The docker-compose will only compile the programs and place them in the `/app` directory.
 
-If you want to inspect the traffic, load up a shell of the `server` client and run install tcpdump `apt-get update && apt-get install -y tcpdump`
+Load up a shell of the `server` container and run the CLI executable at `/app/server 2>1`, enter a command and wait for the output from the shell.
+Then, load up a shell of the `shell` container and run the CLI executable at `/app/client` and let it sit.
+
+If you want to inspect the traffic, install tcpdump `apt-get update && apt-get install -y tcpdump`
 and start listening to the traffic with `tcpdump -XX -i eth0 icmp`.
 
 ## Known Issues
-- Max packet length and message chunks
-- Need to remember old messages and send ACKs on retries
+- Not resilient
+- Need to investigate MTU
+- Plaintext
