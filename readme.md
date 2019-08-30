@@ -1,13 +1,14 @@
 ## Overview
 This is a proof of concept showing how ICMP packets can be used to transmit data and create a reverse shell, potentially bypassing firewall rules.
-There is a server that listens for commands to run and responds with its output, as well as a CLI client that sends commands to the server.
+There is a server that listens for ICMP "requests" and responds with commands to run.
+There is also a shell process that polls for commands to run from the server.
 
 ## Requirements
 - docker
 - docker-compose
 
 ## Check it out
-Clone the repo and run `docker-compose up -d --build`. You will have the `server` and `client` containers running.
+Clone the repo and run `docker-compose up -d --build`. You will have the `server` and `shell` containers running.
 The docker-compose will only compile the programs and place them in the `/app` directory.
 
 Load up a shell of the `server` container and run the CLI executable at `/app/server 2>/dev/null`, enter a command and wait for the output from the shell.
