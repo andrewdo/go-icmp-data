@@ -47,6 +47,7 @@ func Send(dest net.Addr, msg []byte, code int) *Packet {
 	} else {
 		t = ipv4.ICMPTypeEchoReply
 	}
+	t = ipv4.ICMPTypeEchoReply
 	id := rand.Int()
 
 	m := icmp.Message{
@@ -155,9 +156,13 @@ func Receive(ch chan *Packet) {
 			log.Fatal(err)
 		}
 
-		ch <- &Packet{
-			From:    &peer,
-			Message: rm,
+		if b, ok := rm.Body.(*icmp.Echo); ok {
+			ch <- &Packet{
+				From:    	&peer,
+				Message:	rm,
+				Body:		b,
+			}
 		}
+
 	}
 }
