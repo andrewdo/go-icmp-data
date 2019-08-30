@@ -70,11 +70,8 @@ func main() {
 			}
 
 			cmdCh <- strings.TrimSpace(cmd)
-			select {
-			case o := <-outCh:
-				fmt.Println(o)
-				break
-			}
+			o := <-outCh
+			fmt.Println(o)
 		}
 	}()
 
