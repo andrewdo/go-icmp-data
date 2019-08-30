@@ -14,14 +14,16 @@ const(
 	readBufferSize			= 1500
 	timeoutSeconds			= 5
 	numRetries				= 5
-	IcmpCodeAck				= 0
-	IcmpCodeCommandMsg		= 15
+	IcmpCodeCommandRequest	= 15
 	IcmpCodeCommandReply	= 16
+	IcmpCodeCommandOutput	= 8
+	IcmpCodeAck				= 0
 )
 
 type Packet struct {
 	From *net.Addr
 	Message *icmp.Message
+	Body *icmp.Echo
 }
 
 func getConnection() *icmp.PacketConn {
@@ -39,9 +41,16 @@ func Send(dest net.Addr, msg []byte, code int) *Packet {
 	defer conn.Close()
 
 	// TODO: message chunks and use ID for concurrency
+	var t ipv4.ICMPType
+	if code == IcmpCodeCommandRequest || code == IcmpCodeCommandOutput {
+		t = ipv4.ICMPTypeEcho
+	} else {
+		t = ipv4.ICMPTypeEchoReply
+	}
 	id := rand.Int()
+
 	m := icmp.Message{
-		Type: ipv4.ICMPTypeEchoReply,
+		Type: t,
 		Code: code,
 		Body: &icmp.Echo{
 			ID: id,
@@ -63,7 +72,7 @@ func Send(dest net.Addr, msg []byte, code int) *Packet {
 		log.Println("Sent message", msg)
 
 		// dont wait for a reply if we are sending a reply
-		if code == IcmpCodeCommandReply {
+		if code == IcmpCodeCommandReply || code == IcmpCodeAck {
 			return nil
 		}
 
@@ -101,15 +110,16 @@ func waitForReply(conn *icmp.PacketConn, dest net.Addr) *Packet {
 			}
 
 			if rb, ok := rm.Body.(*icmp.Echo); ok {
-				if peer.String() == dest.String() && rm.Code == IcmpCodeCommandReply  {
+				if peer.String() == dest.String() && (rm.Code == IcmpCodeCommandReply || rm.Code == IcmpCodeAck)  {
 					log.Println("Received reply", string(rb.Data))
 					ch <- &Packet{
-						From:    &peer,
-						Message: rm,
+						From:    	&peer,
+						Message:	rm,
+						Body:		rb,
 					}
 					return
 				} else {
-					log.Println("Received message was not the response")
+					log.Println("Received message was not the response", peer.String(), dest.String(), rm.Code)
 				}
 			} else {
 				log.Println("Failed to parse message as Echo body")
@@ -130,7 +140,7 @@ func waitForReply(conn *icmp.PacketConn, dest net.Addr) *Packet {
 	}
 }
 
-func Receive(ch chan Packet) {
+func Receive(ch chan *Packet) {
 	conn := getConnection()
 	defer conn.Close()
 
@@ -145,7 +155,7 @@ func Receive(ch chan Packet) {
 			log.Fatal(err)
 		}
 
-		ch <- Packet{
+		ch <- &Packet{
 			From:    &peer,
 			Message: rm,
 		}

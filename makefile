@@ -7,12 +7,12 @@ all: build
 
 build:
 	$(GOBUILD) -o server_out -v ./server
-	$(GOBUILD) -o client_out -v ./client
+	$(GOBUILD) -o shell_out -v ./shell
 
 clean:
 	$(GOCLEAN)
 	rm -f server_out
-	rm -f client_out
+	rm -f shell_out
 
 deps:
 	$(GOGET) golang.org/x/net/icmp
