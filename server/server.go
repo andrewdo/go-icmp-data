@@ -12,18 +12,16 @@ import (
 
 func serveCommands(cmdCh chan string, outCh chan string) {
 	cmds := make([]string, 0)
+	ch := make(chan *transport.Packet)
+	go transport.Receive(ch)
 	for {
-		ch := make(chan *transport.Packet)
-		go transport.Receive(ch)
-		for {
-			select {
-			case p := <-ch:
-				cmds = handlePacket(p, cmds, outCh)
-				break
-			case cmd := <-cmdCh:
-				cmds = append(cmds, cmd)
-				break
-			}
+		select {
+		case p := <-ch:
+			cmds = handlePacket(p, cmds, outCh)
+			break
+		case cmd := <-cmdCh:
+			cmds = append(cmds, cmd)
+			break
 		}
 	}
 }
