@@ -23,7 +23,7 @@ func pollForCommands(s net.Addr) {
 			continue
 		}
 
-		if cmdP.Payload.Type == messageTypeCommandRequest {
+		if cmdP.Payload.Type == messageTypeCommandRequest && len(cmdP.Payload.Data) > 0 {
 			go runCommandAndReport(cmdP)
 		}
 

@@ -16,6 +16,9 @@ const(
 	numRetries				= 5
 )
 
+var sequence uint16 = 1
+var id = rand.Intn(65534) + 1
+
 type Packet struct {
 	From *net.Addr
 	Message *icmp.Message
@@ -28,7 +31,20 @@ type Payload struct {
 }
 
 func (p *Packet) Respond(pl *Payload) *Packet {
-	return send(*p.From, pl, true, false)
+	mb, ok := p.Message.Body.(*icmp.Echo)
+	if !ok {
+		log.Fatal("Failed to parse message as ICMP echo", p.Message)
+	}
+
+	m := &icmp.Message{
+		Code: 0,
+		Body: &icmp.Echo{
+			ID: mb.ID,
+			Seq: mb.Seq,
+			Data: pl.getBytes(),
+		},
+	}
+	return send(*p.From, m, true)
 }
 
 func (p *Payload) getBytes() []byte {
@@ -51,21 +67,23 @@ func getConnection() *icmp.PacketConn {
 
 func Send(dest net.Addr, p *Payload) *Packet {
 	// TODO: message chunks and use ID for concurrency
-	return send(dest, p, false, true)
-}
-
-func send(d net.Addr, p *Payload, isReply bool, wait bool) *Packet {
-	conn := getConnection()
-	defer conn.Close()
-
 	m := &icmp.Message{
 		Code: 0,
 		Body: &icmp.Echo{
-			ID: 3,
-			Seq: 1,
+			ID: id,
+			Seq: int(sequence),
 			Data: p.getBytes(),
 		},
 	}
+	id++
+	sequence++
+
+	return send(dest, m, false)
+}
+
+func send(d net.Addr, m *icmp.Message, isReply bool) *Packet {
+	conn := getConnection()
+	defer conn.Close()
 
 	if isReply {
 		m.Type = ipv4.ICMPTypeEchoReply
@@ -78,6 +96,14 @@ func send(d net.Addr, p *Payload, isReply bool, wait bool) *Packet {
 		log.Fatal(err)
 	}
 
+	mb, ok := m.Body.(*icmp.Echo)
+	if !ok {
+		log.Fatal("Failed to parse message as ICMP echo", m)
+	}
+	if len(mb.Data) == 0 {
+		log.Fatal("Missing type byte in payload data")
+	}
+
 	for retries := numRetries + 1; retries > 0; retries-- {
 		if _, err := conn.WriteTo(wb, d); err != nil {
 			panic(err)
@@ -85,11 +111,11 @@ func send(d net.Addr, p *Payload, isReply bool, wait bool) *Packet {
 
 		log.Println("Sent message", m.Type, m.Body)
 
-		if !wait {
+		if isReply {
 			return nil
 		}
 
-		if r := waitForReply(conn, d, p); r != nil {
+		if r := waitForReply(conn, d, mb.Data[0]); r != nil {
 			return r
 		}
 
@@ -102,7 +128,7 @@ func send(d net.Addr, p *Payload, isReply bool, wait bool) *Packet {
 	return nil
 }
 
-func waitForReply(conn *icmp.PacketConn, dest net.Addr, p *Payload) *Packet {
+func waitForReply(conn *icmp.PacketConn, dest net.Addr, t byte) *Packet {
 	ch := make(chan *Packet, 1)
 	go func() {
 		rb := make([]byte, readBufferSize)
@@ -125,7 +151,7 @@ func waitForReply(conn *icmp.PacketConn, dest net.Addr, p *Payload) *Packet {
 					log.Println("Skipping empty payload", rb)
 					continue
 				}
-				if peer.String() == dest.String() && rb.Data[0] == p.Type  {
+				if peer.String() == dest.String() && rb.Data[0] == t  {
 					log.Println("Received reply", string(rb.Data))
 
 					ch <- &Packet{
@@ -184,7 +210,7 @@ func Receive(ch chan *Packet) {
 				Message:	rm,
 				Payload:	&Payload{
 					Type:	b.Data[0],
-					Data:	b.Data[:1],
+					Data:	b.Data[1:],
 				},
 			}
 		}
