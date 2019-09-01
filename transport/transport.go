@@ -61,7 +61,7 @@ func send(d net.Addr, p *Payload, isReply bool, wait bool) *Packet {
 	m := &icmp.Message{
 		Code: 0,
 		Body: &icmp.Echo{
-			ID: rand.Int(),
+			ID: 3,
 			Seq: 1,
 			Data: p.getBytes(),
 		},
@@ -83,7 +83,7 @@ func send(d net.Addr, p *Payload, isReply bool, wait bool) *Packet {
 			panic(err)
 		}
 
-		log.Println("Sent message", m.Checksum, m.Body)
+		log.Println("Sent message", m.Type, m.Body)
 
 		if !wait {
 			return nil
@@ -95,7 +95,7 @@ func send(d net.Addr, p *Payload, isReply bool, wait bool) *Packet {
 
 		time.Sleep(time.Duration(rand.Intn(timeoutSeconds) + 1) * time.Second)
 
-		log.Println("Retrying message", d, m.Code, m.Body)
+		log.Println("Retrying message", d, m.Type, m.Body)
 	}
 
 	log.Fatal("Failed after max retries", numRetries)
