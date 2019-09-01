@@ -14,16 +14,29 @@ const(
 	readBufferSize			= 1500
 	timeoutSeconds			= 5
 	numRetries				= 5
-	IcmpCodeCommandRequest	= 15
-	IcmpCodeCommandReply	= 16
-	IcmpCodeCommandOutput	= 8
-	IcmpCodeAck				= 0
 )
 
 type Packet struct {
 	From *net.Addr
 	Message *icmp.Message
-	Body *icmp.Echo
+	Payload *Payload
+}
+
+type Payload struct {
+	Type byte
+	Data []byte
+}
+
+func (p *Packet) Respond(pl *Payload) *Packet {
+	return send(*p.From, pl, true, false)
+}
+
+func (p *Payload) getBytes() []byte {
+	if p.Data == nil {
+		return []byte{p.Type}
+	}
+
+	return append([]byte{p.Type}, p.Data...)
 }
 
 func getConnection() *icmp.PacketConn {
@@ -36,33 +49,29 @@ func getConnection() *icmp.PacketConn {
 	return conn
 }
 
-func Send(dest net.Addr, msg []byte, code int) *Packet {
+func Send(dest net.Addr, p *Payload) *Packet {
 	// TODO: message chunks and use ID for concurrency
-	var t ipv4.ICMPType
-	if code == IcmpCodeCommandRequest || code == IcmpCodeCommandOutput {
-		t = ipv4.ICMPTypeEcho
-	} else {
-		t = ipv4.ICMPTypeEchoReply
-	}
-	t = ipv4.ICMPTypeEchoReply
-	id := rand.Int()
+	return send(dest, p, false, true)
+}
+
+func send(d net.Addr, p *Payload, isReply bool, wait bool) *Packet {
+	conn := getConnection()
+	defer conn.Close()
 
 	m := &icmp.Message{
-		Type: t,
-		Code: code,
+		Code: 0,
 		Body: &icmp.Echo{
-			ID: id,
+			ID: rand.Int(),
 			Seq: 1,
-			Data: msg,
+			Data: p.getBytes(),
 		},
 	}
 
-	return send(dest, m, code != IcmpCodeCommandReply && code != IcmpCodeAck)
-}
-
-func send(d net.Addr, m *icmp.Message, wait bool) *Packet {
-	conn := getConnection()
-	defer conn.Close()
+	if isReply {
+		m.Type = ipv4.ICMPTypeEchoReply
+	} else {
+		m.Type = ipv4.ICMPTypeEcho
+	}
 
 	wb, err := m.Marshal(nil)
 	if err != nil {
@@ -74,13 +83,13 @@ func send(d net.Addr, m *icmp.Message, wait bool) *Packet {
 			panic(err)
 		}
 
-		log.Println("Sent message", m.Body)
+		log.Println("Sent message", m.Checksum, m.Body)
 
 		if !wait {
 			return nil
 		}
 
-		if r := waitForReply(conn, d); r != nil {
+		if r := waitForReply(conn, d, p); r != nil {
 			return r
 		}
 
@@ -93,7 +102,7 @@ func send(d net.Addr, m *icmp.Message, wait bool) *Packet {
 	return nil
 }
 
-func waitForReply(conn *icmp.PacketConn, dest net.Addr) *Packet {
+func waitForReply(conn *icmp.PacketConn, dest net.Addr, p *Payload) *Packet {
 	ch := make(chan *Packet, 1)
 	go func() {
 		rb := make([]byte, readBufferSize)
@@ -112,12 +121,20 @@ func waitForReply(conn *icmp.PacketConn, dest net.Addr) *Packet {
 			}
 
 			if rb, ok := rm.Body.(*icmp.Echo); ok {
-				if peer.String() == dest.String() && (rm.Code == IcmpCodeCommandReply || rm.Code == IcmpCodeAck)  {
+				if len(rb.Data) == 0 {
+					log.Println("Skipping empty payload", rb)
+					continue
+				}
+				if peer.String() == dest.String() && rb.Data[0] == p.Type  {
 					log.Println("Received reply", string(rb.Data))
+
 					ch <- &Packet{
 						From:    	&peer,
 						Message:	rm,
-						Body:		rb,
+						Payload:	&Payload{
+							Type:	rb.Data[0],
+							Data:	rb.Data[1:],
+						},
 					}
 					return
 				} else {
@@ -158,10 +175,17 @@ func Receive(ch chan *Packet) {
 		}
 
 		if b, ok := rm.Body.(*icmp.Echo); ok {
+			if len(b.Data) == 0 {
+				log.Println("Skipping empty payload", rm)
+				continue
+			}
 			ch <- &Packet{
 				From:    	&peer,
 				Message:	rm,
-				Body:		b,
+				Payload:	&Payload{
+					Type:	b.Data[0],
+					Data:	b.Data[:1],
+				},
 			}
 		}
 	}

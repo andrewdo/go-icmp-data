@@ -4,23 +4,25 @@ services:
   server:
     image: golang:latest
     command: bash -c "
-      go get github.com/andrewdo/go-icmp-data/...
+      echo "1" > /proc/sys/net/ipv4/icmp_echo_ignore_all
       && cd /go/src/github.com/andrewdo/go-icmp-data && make deps && make
       && mkdir -p /app && mv /go/src/github.com/andrewdo/go-icmp-data/server_out /app/server
       && tail -f /dev/null
       "
     networks:
       - net
+    privileged: true
   shell:
     image: golang:latest
     command: bash -c "
-      go get github.com/andrewdo/go-icmp-data/...
+      echo "1" > /proc/sys/net/ipv4/icmp_echo_ignore_all
       && cd /go/src/github.com/andrewdo/go-icmp-data && make deps && make
       && mkdir -p /app && mv /go/src/github.com/andrewdo/go-icmp-data/shell_out /app/shell
       && tail -f /dev/null
       "
     networks:
       - net
+    privileged: true
     depends_on:
       - server
 
